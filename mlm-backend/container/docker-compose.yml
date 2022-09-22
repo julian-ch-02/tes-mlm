@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:1.20.1
+    container_name: nginx-mlm
+    ports:
+      - '80:80'
+    links:
+      - mlm-backend
+      - mlm
+    volumes:
+      - ./nginx:/etc/nginx/conf.d:delegated
+      - ../../mlm-backend:/var/www/html/mlm-backend:delegated
+      - ../../mlm:/var/www/html/mlm:delegated
+    networks:
+      mlm-network:
+        ipv4_address: 172.14.0.3
+  mlm-backend:
+    container_name: expressjs-mlm
+    image: express
+    build:
+      context: ../
+      dockerfile: ./container/node.Dockerfile
+    command: npm start
+    ports:
+      - '3001:3001'
+    networks:
+      mlm-network:
+        ipv4_address: 172.14.0.4
+    volumes:
+      - ../../mlm-backend:/var/www/html/mlm-backend:delegated
+      - /var/www/html/mlm-backend/node_modules
+  mlm:
+    container_name: reactjs-mlm
+    image: react
+    build:
+      context: ../../mlm
+      dockerfile: ./container/react.Dockerfile
+    command: npm start
+    ports:
+      - '3000:3000'
+    networks:
+      mlm-network:
+        ipv4_address: 172.14.0.5
+    volumes:
+      - ../../mlm:/var/www/html/mlm:delegated
+      - /var/www/html/mlm/node_modules
+  mysql:
+    image: mysql:latest
+    container_name: mysql-mlm
+    restart: 'on-failure'
+    ports:
+      - '3306:3306'
+    environment:
+      MYSQL_DATABASE: mlm
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      mlm-network:
+        ipv4_address: 172.14.0.2
+networks:
+  mlm-network:
+    name: mlm-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.14.0.0/16
+volumes:
+  mysql-data:
+    external: true
